@@ -12,6 +12,7 @@ import streamlit as st
 from src.auth import current_role, has_role, logout, require_login
 from src.country_names import english_country_name
 from src.database import database_status, initialize_database
+from src.filtering import apply_selection, option_values, valid_selection
 from src.metrics import calculate_kpis, performance_by
 from src.prediction import CATEGORICAL_COLUMNS, NUMERIC_COLUMNS, prediction_input_defaults, predict_delay_probability, train_delay_model
 from src.routing import simulated_route_plan
@@ -55,10 +56,6 @@ def load_delay_model(data_path: str):
     return train_delay_model(load_data(data_path))
 
 
-def option_values(data: pd.DataFrame, column: str) -> list[str]:
-    return sorted(data[column].dropna().astype(str).unique().tolist())
-
-
 def clear_filters() -> None:
     """Clear every dashboard filter in one action."""
     for key in FILTER_KEYS:
@@ -67,26 +64,25 @@ def clear_filters() -> None:
 
 def apply_filters(data: pd.DataFrame) -> pd.DataFrame:
     st.sidebar.header("Dashboard filters")
-    st.sidebar.caption("All charts and KPIs update from these selections.")
+    st.sidebar.caption("All charts and KPIs update from these selections. Each lower filter shows only values available from the filters above it.")
     st.sidebar.button("Clear all filters", on_click=clear_filters, use_container_width=True)
 
-    selected_modes = st.sidebar.multiselect("Shipping mode", option_values(data, "Shipping Mode"), key="shipping_mode_filter")
-    selected_markets = st.sidebar.multiselect("Market", option_values(data, "Market"), key="market_filter")
-    selected_regions = st.sidebar.multiselect("Order region", option_values(data, "Order Region"), key="region_filter")
-    selected_countries = st.sidebar.multiselect("Order country", option_values(data, "Order Country English"), key="country_filter")
-    selected_segments = st.sidebar.multiselect("Customer segment", option_values(data, "Customer Segment"), key="segment_filter")
-
-    filtered = data.copy()
-    selections = {
-        "Shipping Mode": selected_modes,
-        "Market": selected_markets,
-        "Order Region": selected_regions,
-        "Order Country English": selected_countries,
-        "Customer Segment": selected_segments,
-    }
-    for column, selected in selections.items():
-        if selected:
-            filtered = filtered[filtered[column].isin(selected)]
+    filter_flow = [
+        ("Shipping mode", "Shipping Mode", "shipping_mode_filter"),
+        ("Market", "Market", "market_filter"),
+        ("Order region", "Order Region", "region_filter"),
+        ("Order country", "Order Country English", "country_filter"),
+        ("Customer segment", "Customer Segment", "segment_filter"),
+    ]
+    filtered = data
+    for label, column, key in filter_flow:
+        options = option_values(filtered, column)
+        current = st.session_state.get(key, [])
+        cleaned = valid_selection(current, options)
+        if cleaned != current:
+            st.session_state[key] = cleaned
+        selected = st.sidebar.multiselect(label, options, key=key)
+        filtered = apply_selection(filtered, column, selected)
     st.sidebar.caption(f"Showing {len(filtered):,} of {len(data):,} shipments")
     if has_role("Analyst", "Admin"):
         prepare_export = st.sidebar.checkbox("Prepare filtered CSV download", key="prepare_export")
@@ -203,15 +199,28 @@ def render_delay_risk(data: pd.DataFrame) -> None:
 def render_shipping_mode(data: pd.DataFrame) -> None:
     st.subheader("Shipping mode comparison")
     summary = performance_by(data, "Shipping Mode")
+    summary["risk_band"] = pd.cut(
+        summary["delayed_delivery_rate"],
+        bins=[-0.01, 40, 60, 100],
+        labels=["Lower risk", "Moderate risk", "High risk"],
+    ).astype(str)
     chart = (
         alt.Chart(summary)
         .mark_bar(cornerRadiusTopRight=5, cornerRadiusBottomRight=5)
         .encode(
             x=alt.X("Shipping Mode:N", sort="-y", title=None),
             y=alt.Y("delayed_delivery_rate:Q", title="Calculated delayed-delivery rate (%)"),
-            color=alt.Color("average_delay_days:Q", scale=alt.Scale(scheme="orangered"), title="Avg. delay days"),
+            color=alt.Color(
+                "risk_band:N",
+                scale=alt.Scale(
+                    domain=["Lower risk", "Moderate risk", "High risk"],
+                    range=["#22C55E", "#F59E0B", "#EF4444"],
+                ),
+                title="Delay-risk band",
+            ),
             tooltip=[
                 "Shipping Mode:N",
+                "risk_band:N",
                 alt.Tooltip("shipments:Q", format=","),
                 alt.Tooltip("delayed_delivery_rate:Q", format=".2f"),
                 alt.Tooltip("on_time_delivery_rate:Q", format=".2f"),
@@ -375,6 +384,9 @@ def render_recommendations(data: pd.DataFrame) -> None:
 def render_delay_prediction(data: pd.DataFrame) -> None:
     st.subheader("Machine-learning delay prediction")
     st.caption("Historical risk estimate using only fields available before delivery. It supports prioritization; it is not a guarantee of a future outcome.")
+    if not st.checkbox("Load delay prediction model", value=False, help="The model is loaded only when needed so login and filtering stay fast."):
+        st.info("Select 'Load delay prediction model' when you want to estimate delay risk.")
+        return
     model = load_delay_model(str(DATA_PATH))
     first, second, third = st.columns(3)
     first.metric("Validation accuracy", f"{model.accuracy * 100:.1f}%")
@@ -443,6 +455,7 @@ def main() -> None:
     render_user_access()
     st.title("APL Logistics: Delivery Performance Dashboard")
     st.write("Operational analytics for delivery performance, delay risk, shipping modes, and regional bottlenecks.")
+    st.caption("Default view: all 180,519 historical shipments. Use the sidebar filters to calculate results for a specific shipping mode, market, region, country, or customer segment.")
 
     if not DATA_PATH.exists():
         st.error("Prepared data is missing. Run the Day 1 pipeline before starting the dashboard.")

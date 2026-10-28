@@ -162,7 +162,7 @@ def write_research_paper() -> Path:
     )
     keywords = document.add_paragraph()
     keywords.add_run("Keywords: ").bold = True
-    keywords.add_run("supply chain analytics, delivery performance, delay risk, logistics dashboard, Streamlit")
+    keywords.add_run("supply chain analytics, delivery performance, delay prediction, route planning, live API, Streamlit")
 
     add_heading(document, "1 Introduction")
     document.add_paragraph(
@@ -181,6 +181,8 @@ def write_research_paper() -> Path:
         "Compare delivery performance across shipping modes.",
         "Identify high-risk regions, markets, and customer segments.",
         "Deliver findings through an interactive Streamlit dashboard for non-technical stakeholders.",
+        "Estimate historical delay risk using only fields available before delivery.",
+        "Provide controlled access and a local live-data API for operational use.",
     ])
 
     add_heading(document, "3 Dataset and Preparation")
@@ -230,6 +232,10 @@ def write_research_paper() -> Path:
     add_heading(document, "6 Dashboard Implementation")
     document.add_paragraph(
         "The solution is implemented as a Streamlit dashboard using Python, Pandas, Altair, and PyDeck. Users can filter by shipping mode, market, order region, country, and customer segment. The dashboard includes KPI cards, delivery classification, delay-gap distribution, shipping-mode comparison, regional diagnostics, a geographic delay-risk map, a regional priority matrix, downloadable filtered data, and dynamic recommendations.")
+    document.add_paragraph(
+        "The upgraded solution also includes a Logistic Regression delay-risk model. It uses scheduled shipping days, shipping mode, market, region, customer segment, category, discount rate, product price, and quantity; it deliberately excludes actual shipping days and final delivery status to avoid target leakage. On a held-out historical test set, the model achieved 69.8 percent accuracy and a ROC-AUC score of 0.740. The prediction is presented as a prioritization aid, not an automated decision or a guarantee of a future outcome.")
+    document.add_paragraph(
+        "A route-planning simulator generates a nearest-neighbour visit order for high-volume customer locations. A local SQLite database and FastAPI service provide health, summary, and non-personal shipment endpoints. The dashboard applies Viewer, Analyst, and Admin roles: Analysts can export filtered data and use the prediction and planning tools; Admins can also refresh the local database.")
 
     add_heading(document, "7 Recommendations")
     add_bullets(document, [
@@ -240,13 +246,13 @@ def write_research_paper() -> Path:
         "Keep the calculated delay metric and source late-risk flag separate in management reporting.",
     ])
 
-    add_heading(document, "8 Limitations and Future Scope")
+    add_heading(document, "8 Limitations and Deployment Scope")
     document.add_paragraph(
-        "The supplied CSV does not include an order or delivery date, so time-series trends and date-range filtering are outside the current scope. The analysis is diagnostic and identifies historical associations; it does not prove causation or predict future outcomes. A later phase could add time-based data, live operational feeds, predictive delay modeling, and route or shipping-mode optimization after stakeholders validate the diagnostic findings.")
+        "The supplied CSV does not include an order or delivery date, so time-series trends and date-range filtering are outside the current scope. The route feature is a planning simulator because the dataset has no warehouse origin, road network, traffic, carrier cost, or service-time data. The local SQLite database, FastAPI service, and demonstration login are suitable for an internship prototype, not a public production deployment. Production use would require managed authentication, secret storage, HTTPS, backup policies, rate limiting, and a hosted database.")
 
     add_heading(document, "9 Conclusion")
     document.add_paragraph(
-        "This project converts a large shipment dataset into an operational decision tool. It establishes a verified baseline for delivery performance, identifies significant shipping-mode risk, and gives stakeholders a direct way to explore geographic and customer-related delay patterns. The current dashboard is a complete diagnostic foundation for improving logistics visibility before any predictive or optimization work is introduced.")
+        "This project converts a large shipment dataset into an operational decision tool. It establishes a verified baseline for delivery performance, identifies significant shipping-mode risk, and gives stakeholders a direct way to explore geographic and customer-related delay patterns. It now combines diagnostic analytics with a measured historical delay-risk model, controlled dashboard access, a local live-data API, and a clearly scoped route-planning simulator.")
     path = OUTPUT_DIR / "APL_Logistics_Research_Paper.docx"
     document.save(path)
     return path
@@ -261,7 +267,7 @@ def write_executive_summary() -> Path:
         "Stakeholder briefing on historical delivery performance",
     )
     document.add_paragraph(
-        "The delivery-performance dashboard shows that delay exposure is material and concentrated in specific shipping modes. The immediate priority is to review service promises and operating conditions for First Class and Second Class shipments. The dashboard is ready for managers to filter by market, region, country, and customer segment and to download the underlying filtered records for follow-up.")
+        "The delivery-performance dashboard shows that delay exposure is material and concentrated in specific shipping modes. The immediate priority is to review service promises and operating conditions for First Class and Second Class shipments. The upgraded dashboard also provides historical delay-risk estimates, local live-data API support, controlled user roles, and a route-planning simulator for operational exploration.")
 
     add_heading(document, "What the analysis found")
     add_table(document, ["Headline measure", "Result", "What it means"], [
@@ -289,11 +295,17 @@ def write_executive_summary() -> Path:
 
     add_heading(document, "What stakeholders can use now")
     document.add_paragraph(
-        "The Streamlit dashboard is ready for local use. It provides KPI cards, delay distributions, shipping-mode comparison, regional and geographic risk views, a priority matrix, filter controls, and a filtered-data download. It is designed for diagnosis and prioritization, not for predicting future delivery delays.")
+        "The Streamlit dashboard is ready for local use. It provides KPI cards, delay distributions, shipping-mode comparison, regional and geographic risk views, a priority matrix, filter controls, a filtered-data download, and a machine-learning delay-risk estimate. The model achieved 69.8 percent validation accuracy and 0.740 ROC-AUC on historical held-out data. It supports prioritization, not automatic decisions or a guarantee of future delivery outcomes.")
+    add_bullets(document, [
+        "Viewer users can review the dashboard overview and operational metrics.",
+        "Analyst users can export filtered data and use delay prediction and route-planning tools.",
+        "Admin users can refresh the local SQLite database that supports the FastAPI health, summary, and shipment endpoints.",
+        "The route-planning feature is a customer-coordinate simulator, not a real road, traffic, or carrier-cost optimizer.",
+    ])
 
     add_heading(document, "Scope note")
     document.add_paragraph(
-        "The supplied data has no order or delivery date field, so the dashboard intentionally does not provide date-range filtering or time-trend analysis. A future phase can add those capabilities when time-stamped operational data becomes available.")
+        "The supplied data has no order or delivery date field, so the dashboard intentionally does not provide date-range filtering or time-trend analysis. The SQLite database, FastAPI service, and role login are local prototype components. A public deployment requires managed authentication, HTTPS, secret storage, backups, rate limits, and a hosted database.")
     path = OUTPUT_DIR / "APL_Logistics_Executive_Summary.docx"
     document.save(path)
     return path

@@ -50,7 +50,7 @@ class DashboardRenderTests(unittest.TestCase):
             ["First Class"],
             ["Africa"],
             ["North Africa"],
-            ["Argelia"],
+            ["Algeria"],
             ["Consumer"],
         ]
         for widget, value in zip(app.multiselect, values, strict=True):

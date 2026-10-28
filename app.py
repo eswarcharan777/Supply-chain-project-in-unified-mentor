@@ -10,6 +10,7 @@ import pydeck as pdk
 import streamlit as st
 
 from src.auth import current_role, has_role, logout, require_login
+from src.country_names import english_country_name
 from src.database import database_status, initialize_database
 from src.metrics import calculate_kpis, performance_by
 from src.prediction import CATEGORICAL_COLUMNS, NUMERIC_COLUMNS, prediction_input_defaults, predict_delay_probability, train_delay_model
@@ -33,6 +34,7 @@ def load_data(path: str) -> pd.DataFrame:
     data = pd.read_csv(path)
     data["is_delayed"] = data["is_delayed"].astype(bool)
     data["is_on_time_or_early"] = data["is_on_time_or_early"].astype(bool)
+    data["Order Country English"] = data["Order Country"].map(english_country_name)
     return data
 
 
@@ -59,7 +61,7 @@ def apply_filters(data: pd.DataFrame) -> pd.DataFrame:
     selected_modes = st.sidebar.multiselect("Shipping mode", option_values(data, "Shipping Mode"), key="shipping_mode_filter")
     selected_markets = st.sidebar.multiselect("Market", option_values(data, "Market"), key="market_filter")
     selected_regions = st.sidebar.multiselect("Order region", option_values(data, "Order Region"), key="region_filter")
-    selected_countries = st.sidebar.multiselect("Order country", option_values(data, "Order Country"), key="country_filter")
+    selected_countries = st.sidebar.multiselect("Order country", option_values(data, "Order Country English"), key="country_filter")
     selected_segments = st.sidebar.multiselect("Customer segment", option_values(data, "Customer Segment"), key="segment_filter")
 
     filtered = data.copy()
@@ -67,7 +69,7 @@ def apply_filters(data: pd.DataFrame) -> pd.DataFrame:
         "Shipping Mode": selected_modes,
         "Market": selected_markets,
         "Order Region": selected_regions,
-        "Order Country": selected_countries,
+        "Order Country English": selected_countries,
         "Customer Segment": selected_segments,
     }
     for column, selected in selections.items():
@@ -194,7 +196,7 @@ def render_shipping_mode(data: pd.DataFrame) -> None:
 
 def render_regional_analysis(data: pd.DataFrame) -> None:
     st.subheader("Regional and market diagnostics")
-    grouping = st.radio("Analyze by", ["Order Region", "Market", "Order Country"], horizontal=True)
+    grouping = st.radio("Analyze by", ["Order Region", "Market", "Order Country English"], horizontal=True)
     summary = performance_by(data, grouping).sort_values("delayed_delivery_rate", ascending=False)
     display_summary = summary.head(20)
     chart = (
@@ -249,7 +251,7 @@ def render_geographic_risk_map(data: pd.DataFrame) -> None:
     map_data["Longitude"] = pd.to_numeric(map_data["Longitude"], errors="coerce")
     map_data = map_data.dropna(subset=["Latitude", "Longitude"])
     map_summary = (
-        map_data.groupby(["Order Country", "Latitude", "Longitude"], as_index=False)
+        map_data.groupby(["Order Country English", "Latitude", "Longitude"], as_index=False)
         .agg(
             shipments=("delivery_delay_gap", "size"),
             delayed_rate=("is_delayed", "mean"),
@@ -286,7 +288,7 @@ def render_geographic_risk_map(data: pd.DataFrame) -> None:
         opacity=0.75,
     )
     tooltip = {
-        "html": "<b>{Order Country}</b><br/>Shipments: {shipments}<br/>Delayed rate: {delayed_rate_pct}%<br/>Average delay: {average_delay_days} days",
+        "html": "<b>{Order Country English}</b><br/>Shipments: {shipments}<br/>Delayed rate: {delayed_rate_pct}%<br/>Average delay: {average_delay_days} days",
         "style": {"backgroundColor": "#111827", "color": "white"},
     }
     st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state, tooltip=tooltip), width="stretch")

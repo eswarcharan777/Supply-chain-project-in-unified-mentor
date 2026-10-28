@@ -286,10 +286,7 @@ def render_priority_matrix(data: pd.DataFrame) -> None:
 
 def render_geographic_risk_map(data: pd.DataFrame) -> None:
     st.subheader("Geographic delay-risk map")
-    st.caption("Each circle represents a customer-location cluster. Larger and redder circles indicate more shipments and a higher calculated delayed-delivery rate.")
-    if not st.checkbox("Load interactive map", value=False, help="Load the map only when needed to keep the dashboard responsive."):
-        st.info("Map loading is optional. Select 'Load interactive map' when you want to inspect locations.")
-        return
+    st.caption("Map of the current filtered selection. Each circle represents a customer-location cluster; larger and redder circles indicate more shipments and a higher calculated delayed-delivery rate.")
     map_data = data.copy()
     map_data["Latitude"] = pd.to_numeric(map_data["Latitude"], errors="coerce")
     map_data["Longitude"] = pd.to_numeric(map_data["Longitude"], errors="coerce")
@@ -481,9 +478,9 @@ def main() -> None:
     st.divider()
     render_regional_analysis(data)
     st.divider()
-    render_priority_matrix(data)
-    st.divider()
     render_geographic_risk_map(data)
+    st.divider()
+    render_priority_matrix(data)
     st.divider()
     render_key_insights(data)
     st.divider()

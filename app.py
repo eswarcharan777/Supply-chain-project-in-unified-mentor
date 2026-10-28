@@ -26,14 +26,26 @@ st.set_page_config(
 DATA_PATH = Path("data/processed/cleaned_logistics.csv")
 DATABASE_PATH = Path("data/live/apl_logistics.db")
 CATEGORY_COLORS = {"Early": "#10B981", "On Time": "#2563EB", "Delayed": "#DC2626"}
-FILTER_KEYS = ["shipping_mode_filter", "market_filter", "region_filter", "country_filter", "segment_filter"]
+FILTER_KEYS = ["shipping_mode_filter", "market_filter", "region_filter", "country_filter", "segment_filter", "prepare_export"]
+DASHBOARD_COLUMNS = [
+    "Days for shipping (real)", "Days for shipment (scheduled)", "Late_delivery_risk", "Delivery Status",
+    "Shipping Mode", "Market", "Order Region", "Order Country", "Customer Segment", "Category Name",
+    "Order Item Discount Rate", "Order Item Product Price", "Order Item Quantity", "Latitude", "Longitude",
+    "delivery_delay_gap", "delivery_category", "is_delayed", "is_on_time_or_early",
+]
 
 
 @st.cache_data(show_spinner="Loading prepared logistics data...")
 def load_data(path: str) -> pd.DataFrame:
-    data = pd.read_csv(path)
-    data["is_delayed"] = data["is_delayed"].astype(bool)
-    data["is_on_time_or_early"] = data["is_on_time_or_early"].astype(bool)
+    data = pd.read_csv(path, usecols=DASHBOARD_COLUMNS)
+    # Recalculate these flags from the core business rule rather than trusting
+    # serialized boolean values. This keeps every displayed percentage aligned
+    # with actual shipping days minus scheduled shipping days.
+    delay_gap = pd.to_numeric(data["Days for shipping (real)"], errors="coerce") - pd.to_numeric(data["Days for shipment (scheduled)"], errors="coerce")
+    data["delivery_delay_gap"] = delay_gap
+    data["is_delayed"] = delay_gap.gt(0)
+    data["is_on_time_or_early"] = delay_gap.le(0)
+    data["Late_delivery_risk"] = pd.to_numeric(data["Late_delivery_risk"], errors="coerce")
     data["Order Country English"] = data["Order Country"].map(english_country_name)
     return data
 
@@ -77,13 +89,20 @@ def apply_filters(data: pd.DataFrame) -> pd.DataFrame:
             filtered = filtered[filtered[column].isin(selected)]
     st.sidebar.caption(f"Showing {len(filtered):,} of {len(data):,} shipments")
     if has_role("Analyst", "Admin"):
-        st.sidebar.download_button(
-            "Download filtered data (CSV)",
-            data=filtered.to_csv(index=False).encode("utf-8"),
-            file_name="apl_logistics_filtered.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
+        prepare_export = st.sidebar.checkbox("Prepare filtered CSV download", key="prepare_export")
+        if prepare_export:
+            # Generate export data only on explicit request; generating a large
+            # CSV on every widget rerun was a major source of UI lag.
+            export_data = filtered.drop(columns=["Order Country English"], errors="ignore")
+            st.sidebar.download_button(
+                "Download filtered data (CSV)",
+                data=export_data.to_csv(index=False).encode("utf-8"),
+                file_name="apl_logistics_filtered.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        else:
+            st.sidebar.caption("Select the checkbox to prepare a CSV download.")
     else:
         st.sidebar.caption("Filtered-data export requires an Analyst or Admin role.")
     return filtered
@@ -143,13 +162,24 @@ def render_delay_risk(data: pd.DataFrame) -> None:
     st.subheader("Delay risk analysis")
     left, right = st.columns(2)
     with left:
+        # Send 14 aggregated rows to the browser instead of all shipments.
+        binned = pd.cut(data["delivery_delay_gap"], bins=14, include_lowest=True)
+        delay_histogram_data = (
+            data.assign(delay_bin=binned)
+            .groupby("delay_bin", observed=True)
+            .size()
+            .reset_index(name="shipments")
+        )
+        delay_histogram_data["bin_start"] = delay_histogram_data["delay_bin"].map(lambda interval: float(interval.left))
+        delay_histogram_data["bin_end"] = delay_histogram_data["delay_bin"].map(lambda interval: float(interval.right))
         delay_histogram = (
-            alt.Chart(data)
+            alt.Chart(delay_histogram_data)
             .mark_bar(color="#2563EB")
             .encode(
-                x=alt.X("delivery_delay_gap:Q", bin=alt.Bin(maxbins=14), title="Actual minus scheduled shipping days"),
-                y=alt.Y("count():Q", title="Shipments"),
-                tooltip=[alt.Tooltip("count():Q", title="Shipments", format=",")],
+                x=alt.X("bin_start:Q", title="Actual minus scheduled shipping days"),
+                x2="bin_end:Q",
+                y=alt.Y("shipments:Q", title="Shipments"),
+                tooltip=[alt.Tooltip("bin_start:Q", title="From"), alt.Tooltip("bin_end:Q", title="To"), alt.Tooltip("shipments:Q", title="Shipments", format=",")],
             )
             .properties(title="Distribution of delivery delay gaps")
         )
@@ -246,6 +276,9 @@ def render_priority_matrix(data: pd.DataFrame) -> None:
 def render_geographic_risk_map(data: pd.DataFrame) -> None:
     st.subheader("Geographic delay-risk map")
     st.caption("Each circle represents a customer-location cluster. Larger and redder circles indicate more shipments and a higher calculated delayed-delivery rate.")
+    if not st.checkbox("Load interactive map", value=False, help="Load the map only when needed to keep the dashboard responsive."):
+        st.info("Map loading is optional. Select 'Load interactive map' when you want to inspect locations.")
+        return
     map_data = data.copy()
     map_data["Latitude"] = pd.to_numeric(map_data["Latitude"], errors="coerce")
     map_data["Longitude"] = pd.to_numeric(map_data["Longitude"], errors="coerce")
@@ -258,9 +291,9 @@ def render_geographic_risk_map(data: pd.DataFrame) -> None:
             average_delay_days=("delivery_delay_gap", "mean"),
         )
     )
-    # Large raw datasets can contain thousands of coordinate clusters. Display the
-    # highest-volume 750 locations to keep the map readable and responsive.
-    map_summary = map_summary.sort_values("shipments", ascending=False).head(750).copy()
+    # Limit rendering to the largest 250 locations to prevent browser lag while
+    # retaining the most operationally material clusters.
+    map_summary = map_summary.sort_values("shipments", ascending=False).head(250).copy()
     map_summary["delayed_rate_pct"] = (map_summary["delayed_rate"] * 100).round(2)
     map_summary["average_delay_days"] = map_summary["average_delay_days"].round(2)
     map_summary["radius"] = map_summary["shipments"].clip(lower=1).pow(0.5) * 17000

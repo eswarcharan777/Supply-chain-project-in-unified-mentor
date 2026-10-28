@@ -1,0 +1,15 @@
+{
+  "data_audit": {
+    "source_rows": 180519,
+    "duplicate_rows_removed": 0,
+    "invalid_duration_rows_removed": 0,
+    "analysis_rows": 180519
+  },
+  "kpis": {
+    "total_shipments": 180519,
+    "on_time_delivery_rate": 42.72,
+    "late_delivery_rate": 57.28,
+    "average_delivery_delay_days": 0.57,
+    "late_delivery_risk_ratio": 54.83
+  }
+}

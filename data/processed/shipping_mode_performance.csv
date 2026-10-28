@@ -1,0 +1,5 @@
+Shipping Mode,shipments,average_delay_days,delayed_delivery_rate,on_time_delivery_rate
+Standard Class,107752,-0.0,39.77,60.23
+Second Class,35216,1.99,79.73,20.27
+First Class,27814,1.0,100.0,0.0
+Same Day,9737,0.48,47.83,52.17

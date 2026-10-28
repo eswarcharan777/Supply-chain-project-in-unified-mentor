@@ -1,0 +1,12 @@
+column,missing_values,distinct_values
+Days for shipping (real),0,7
+Days for shipment (scheduled),0,4
+Late_delivery_risk,0,2
+Delivery Status,0,4
+Shipping Mode,0,4
+Order Region,0,23
+Order Country,0,164
+Market,0,5
+Customer Segment,0,3
+delivery_delay_gap,0,7
+delivery_category,0,3

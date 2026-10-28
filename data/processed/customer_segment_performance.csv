@@ -1,0 +1,4 @@
+Customer Segment,shipments,average_delay_days,delayed_delivery_rate,on_time_delivery_rate
+Consumer,93504,0.56,57.29,42.71
+Corporate,54789,0.56,57.11,42.89
+Home Office,32226,0.58,57.52,42.48

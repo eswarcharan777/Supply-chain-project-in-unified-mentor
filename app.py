@@ -62,7 +62,7 @@ def clear_filters() -> None:
         st.session_state[key] = []
 
 
-def apply_filters(data: pd.DataFrame) -> pd.DataFrame:
+def apply_filters(data: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
     st.sidebar.header("Dashboard filters")
     st.sidebar.caption("All charts and KPIs update from these selections. Each lower filter shows only values available from the filters above it.")
     st.sidebar.button("Clear all filters", on_click=clear_filters, use_container_width=True)
@@ -75,6 +75,7 @@ def apply_filters(data: pd.DataFrame) -> pd.DataFrame:
         ("Customer segment", "Customer Segment", "segment_filter"),
     ]
     filtered = data
+    has_active_filter = False
     for label, column, key in filter_flow:
         options = option_values(filtered, column)
         current = st.session_state.get(key, [])
@@ -82,6 +83,7 @@ def apply_filters(data: pd.DataFrame) -> pd.DataFrame:
         if cleaned != current:
             st.session_state[key] = cleaned
         selected = st.sidebar.multiselect(label, options, key=key)
+        has_active_filter = has_active_filter or bool(selected)
         filtered = apply_selection(filtered, column, selected)
     st.sidebar.caption(f"Showing {len(filtered):,} of {len(data):,} shipments")
     if has_role("Analyst", "Admin"):
@@ -101,7 +103,7 @@ def apply_filters(data: pd.DataFrame) -> pd.DataFrame:
             st.sidebar.caption("Select the checkbox to prepare a CSV download.")
     else:
         st.sidebar.caption("Filtered-data export requires an Analyst or Admin role.")
-    return filtered
+    return filtered, has_active_filter
 
 
 def percent_format(value: float) -> str:
@@ -455,7 +457,7 @@ def main() -> None:
     render_user_access()
     st.title("APL Logistics: Delivery Performance Dashboard")
     st.write("Operational analytics for delivery performance, delay risk, shipping modes, and regional bottlenecks.")
-    st.caption("Default view: all 180,519 historical shipments. Use the sidebar filters to calculate results for a specific shipping mode, market, region, country, or customer segment.")
+    st.caption("Choose one or more sidebar filters to calculate the dashboard results for your selected scope.")
 
     if not DATA_PATH.exists():
         st.error("Prepared data is missing. Run the Day 1 pipeline before starting the dashboard.")
@@ -463,7 +465,10 @@ def main() -> None:
         st.stop()
 
     raw_data = load_data(str(DATA_PATH))
-    data = apply_filters(raw_data)
+    data, has_active_filter = apply_filters(raw_data)
+    if not has_active_filter:
+        st.info("Select at least one filter from the sidebar to load delivery statistics, charts, and recommendations.")
+        st.stop()
     if data.empty:
         st.warning("No shipments match the selected filters. Clear one or more filters and try again.")
         st.stop()

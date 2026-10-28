@@ -21,18 +21,16 @@ class DashboardRenderTests(unittest.TestCase):
         os.environ["TMP"] = str(TMP_DIR)
         os.environ["STREAMLIT_TEST_MODE"] = "1"
 
-    def test_default_dashboard_renders_all_core_controls(self) -> None:
+    def test_default_dashboard_waits_for_a_filter_selection(self) -> None:
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))
         app.run(timeout=120)
         self.assertFalse(app.exception)
-        self.assertGreaterEqual(len(app.metric), 5)
+        self.assertEqual(len(app.metric), 0)
         self.assertGreaterEqual(len(app.multiselect), 5)
         self.assertEqual(len(app.download_button), 0)
-        self.assertGreaterEqual(len(app.info), 1)
-        self.assertGreaterEqual(len(app.warning), 1)
-        self.assertIn("180,519", app.metric[0].value)
+        self.assertIn("Select at least one filter", app.info[0].value)
 
-    def test_shipping_filter_and_clear_all_return_expected_counts(self) -> None:
+    def test_shipping_filter_and_clear_all_return_to_filter_prompt(self) -> None:
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))
         app.run(timeout=120)
         app.multiselect[0].set_value(["First Class"]).run(timeout=120)
@@ -41,7 +39,8 @@ class DashboardRenderTests(unittest.TestCase):
         self.assertEqual(app.metric[2].value, "100.00%")
         app.button[1].click().run(timeout=120)
         self.assertFalse(app.exception)
-        self.assertEqual(app.metric[0].value, "180,519")
+        self.assertEqual(len(app.metric), 0)
+        self.assertIn("Select at least one filter", app.info[0].value)
 
     def test_exact_narrow_filter_case_from_manual_validation(self) -> None:
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))

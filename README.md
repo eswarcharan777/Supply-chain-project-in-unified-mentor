@@ -40,6 +40,29 @@ APL_Logistics.csv
     -> stakeholder insights and exportable filtered data
 ```
 
+## Tech stack
+
+- Python
+- Streamlit
+- Pandas
+- Altair
+- Scikit-learn
+- SQLite
+- FastAPI
+- Uvicorn
+
+## Project structure
+
+```text
+app.py                 # Streamlit dashboard
+api.py                 # FastAPI application
+src/                   # Data processing, metrics, authentication, ML, routing, and database modules
+data/processed/        # Cleaned dataset and analysis outputs
+tests/                 # Automated tests
+deliverables/          # Research paper and executive summary
+screenshots/           # Final project evidence screenshots
+```
+
 ## Run the data pipeline
 
 ```powershell
@@ -61,6 +84,22 @@ After running the Day 1 pipeline, start the Streamlit application:
 ```powershell
 & 'C:\Users\ASUS\AppData\Local\Programs\Python\Python313\python.exe' -m streamlit run app.py
 ```
+
+For a generic setup, install the project dependencies and start Streamlit with:
+
+```powershell
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+## Live dashboard
+
+[Open the deployed Streamlit dashboard](https://eswarcharan777-supply-chain-project-in-unified-mento-app-cmdjcl.streamlit.app/)
+
+## Screenshots and demo
+
+- Final dashboard evidence is available in the [`screenshots/`](screenshots/) folder.
+- The project demo video will be added to the final submission package.
 
 ## Access roles
 

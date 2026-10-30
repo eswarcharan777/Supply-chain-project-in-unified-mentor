@@ -2,3 +2,5 @@ __pycache__/
 .qa/
 .tmp-streamlit-test/
 data/live/*.db
+.venv/
+.env

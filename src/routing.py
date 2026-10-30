@@ -21,13 +21,22 @@ def simulated_route_plan(data: pd.DataFrame, origin_lat: float, origin_lon: floa
     This is a planning simulation only. The dataset has customer coordinates but
     no warehouse, road, traffic, carrier, or cost information.
     """
-    columns = ["Order Country", "Order City", "Latitude", "Longitude", "delivery_delay_gap"]
+    columns = ["Order Country", "Latitude", "Longitude", "delivery_delay_gap"]
+    # Order City is useful context for a stop, but it is not part of the
+    # dashboard's column set. Fall back gracefully when it is absent instead of
+    # raising a KeyError.
+    has_city = "Order City" in data.columns
+    if has_city:
+        columns.insert(1, "Order City")
     frame = data[columns].copy()
     frame["Latitude"] = pd.to_numeric(frame["Latitude"], errors="coerce")
     frame["Longitude"] = pd.to_numeric(frame["Longitude"], errors="coerce")
     frame = frame.dropna(subset=["Latitude", "Longitude"])
+    group_keys = ["Order Country", "Latitude", "Longitude"]
+    if has_city:
+        group_keys.insert(1, "Order City")
     locations = (
-        frame.groupby(["Order Country", "Order City", "Latitude", "Longitude"], as_index=False)
+        frame.groupby(group_keys, as_index=False)
         .agg(shipments=("delivery_delay_gap", "size"), average_delay_days=("delivery_delay_gap", "mean"))
         .sort_values("shipments", ascending=False)
         .head(max(1, stops))
@@ -44,7 +53,7 @@ def simulated_route_plan(data: pd.DataFrame, origin_lat: float, origin_lon: floa
         plan.append({
             "stop": len(plan) + 1,
             "country": next_stop["Order Country"],
-            "city": next_stop["Order City"],
+            "city": next_stop.get("Order City", ""),
             "shipments": int(next_stop["shipments"]),
             "average_delay_days": round(float(next_stop["average_delay_days"]), 2),
             "leg_distance_km": round(leg_distance, 1),

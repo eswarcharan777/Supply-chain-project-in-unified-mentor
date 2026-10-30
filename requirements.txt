@@ -1,6 +1,13 @@
 altair>=5.0
 pandas>=2.2
-streamlit>=1.39,<2.0
+# Streamlit >=1.49 is required: the dashboard calls st.altair_chart(width="stretch")
+# and st.dataframe(width="stretch"). Those parameters do not exist before 1.49 and
+# raise TypeError on import-time use.
+streamlit>=1.49,<2.0
 fastapi>=0.115
 uvicorn>=0.30
 scikit-learn>=1.5
+# Required by build_documents.py to generate the Word deliverables.
+python-docx>=1.1
+# Used by render_with_word.py on Windows to export DOCX to PDF (optional).
+pywin32>=306; sys_platform == "win32"

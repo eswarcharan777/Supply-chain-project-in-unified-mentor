@@ -37,7 +37,10 @@ class DashboardRenderTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertEqual(app.metric[0].value, "27,814")
         self.assertEqual(app.metric[2].value, "100.00%")
-        app.button[1].click().run(timeout=120)
+        # Target the control by label: button indexes shift as panels are
+        # rendered, so a positional click can hit an unrelated button.
+        clear_button = next(button for button in app.button if button.label == "Clear all filters")
+        clear_button.click().run(timeout=120)
         self.assertFalse(app.exception)
         self.assertEqual(len(app.metric), 0)
         self.assertIn("Select at least one filter", app.info[0].value)
@@ -58,6 +61,19 @@ class DashboardRenderTests(unittest.TestCase):
         self.assertFalse(app.exception)
         self.assertEqual(app.metric[0].value, "30")
         self.assertEqual(app.metric[2].value, "100.00%")
+
+    def test_route_simulator_generates_a_plan_without_errors(self) -> None:
+        # The route simulator reads the dashboard's loaded columns, which do not
+        # include Order City. This guards against a KeyError that silently
+        # broke the feature while the screenshot evidence still showed a
+        # rendered panel.
+        app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))
+        app.run(timeout=120)
+        app.multiselect[0].set_value(["First Class"]).run(timeout=120)
+        simulate = next(button for button in app.button if button.label == "Generate simulated visit plan")
+        simulate.click().run(timeout=120)
+        self.assertFalse(app.exception)
+        self.assertTrue(any(metric.value.endswith("km") for metric in app.metric))
 
 
 if __name__ == "__main__":

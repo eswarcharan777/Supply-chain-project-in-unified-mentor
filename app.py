@@ -27,10 +27,11 @@ st.set_page_config(
 DATA_PATH = Path("data/processed/cleaned_logistics.csv")
 DATABASE_PATH = Path("data/live/apl_logistics.db")
 CATEGORY_COLORS = {"Early": "#10B981", "On Time": "#2563EB", "Delayed": "#DC2626"}
-FILTER_KEYS = ["shipping_mode_filter", "market_filter", "region_filter", "country_filter", "segment_filter", "prepare_export"]
+FILTER_KEYS = ["shipping_mode_filter", "market_filter", "region_filter", "country_filter", "segment_filter"]
+EXPORT_KEY = "prepare_export"
 DASHBOARD_COLUMNS = [
     "Days for shipping (real)", "Days for shipment (scheduled)", "Late_delivery_risk", "Delivery Status",
-    "Shipping Mode", "Market", "Order Region", "Order Country", "Customer Segment", "Category Name",
+    "Shipping Mode", "Market", "Order Region", "Order Country", "Order City", "Customer Segment", "Category Name",
     "Order Item Discount Rate", "Order Item Product Price", "Order Item Quantity", "Latitude", "Longitude",
     "delivery_delay_gap", "delivery_category", "is_delayed", "is_on_time_or_early",
 ]
@@ -60,6 +61,10 @@ def clear_filters() -> None:
     """Clear every dashboard filter in one action."""
     for key in FILTER_KEYS:
         st.session_state[key] = []
+    # The export toggle is a checkbox, not a list widget. Assigning a list to a
+    # checkbox's session state raises a TypeError inside Streamlit, so reset it
+    # to its boolean value instead.
+    st.session_state[EXPORT_KEY] = False
 
 
 def apply_filters(data: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
@@ -87,7 +92,7 @@ def apply_filters(data: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
         filtered = apply_selection(filtered, column, selected)
     st.sidebar.caption(f"Showing {len(filtered):,} of {len(data):,} shipments")
     if has_role("Analyst", "Admin"):
-        prepare_export = st.sidebar.checkbox("Prepare filtered CSV download", key="prepare_export")
+        prepare_export = st.sidebar.checkbox("Prepare filtered CSV download", key=EXPORT_KEY)
         if prepare_export:
             # Generate export data only on explicit request; generating a large
             # CSV on every widget rerun was a major source of UI lag.

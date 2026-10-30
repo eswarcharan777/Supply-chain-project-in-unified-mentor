@@ -123,15 +123,19 @@ Available endpoints:
 - `GET /summary` — delivery summary from SQLite
 - `GET /shipments?limit=100&shipping_mode=Standard%20Class` — non-personal operational shipment fields
 
+The API currently has **no authentication of its own**. The dashboard's Viewer/Analyst/Admin roles do not protect these endpoints. Bind it to localhost only and add authentication before exposing it on a shared network.
+
 ## Upgrade scope and limitations
 
-- The delay-risk model predicts a historical delayed-delivery label using fields available before delivery. It is an operational prioritization aid, not an automated decision system or a guarantee.
+- The delay-risk model predicts a historical delayed-delivery label using fields available before delivery. It is an operational prioritization aid, not an automated decision system or a guarantee. Its 69.8% accuracy should be read against a 57.28% always-predict-delayed baseline, and `Days for shipment (scheduled)` is a near-perfect proxy for shipping mode, so much of the learned signal is service level rather than an independent predictor.
 - The route planner is a nearest-neighbour planning simulator based on customer coordinates. The supplied dataset does not include warehouse origins, road network, traffic, carrier-cost, or service-time data, so it is not a real navigation or cost-optimization engine.
 - SQLite and FastAPI are local development components. A production deployment needs managed authentication, secret storage, database backups, HTTPS, rate limiting, and an externally hosted database.
+- `data/processed/cleaned_logistics.csv` is a full-fidelity copy of the source and contains customer-identifying columns (`Customer Fname`, `Customer Lname`, `Customer Street`, `Customer Zipcode`, `Order Customer Id`). The dashboard never loads or exports those fields, but the file is committed to the repository. Remove it from version control and add it to `.gitignore` before publishing this repository.
+- `STREAMLIT_TEST_MODE=1` bypasses the login screen and grants Admin. Never set this environment variable on a deployed instance.
 
 ## Run verification tests
 
-The Day 8 test suite validates cleaning rules, KPIs, grouped performance, default dashboard rendering, sidebar filters, the clear-all control, and a narrow real-data filter case.
+The test suite validates cleaning rules, KPIs, grouped performance, default dashboard rendering, sidebar filters, the clear-all control, the route-planning simulator, and a narrow real-data filter case.
 
 ```powershell
 & 'C:\Users\ASUS\AppData\Local\Programs\Python\Python313\python.exe' -m unittest discover -s tests -v
@@ -142,9 +146,13 @@ The Day 8 test suite validates cleaning rules, KPIs, grouped performance, defaul
 - 180,519 valid analysis rows are retained from the supplied CSV.
 - Delivery performance is calculated from actual minus scheduled shipping days.
 - Dashboard filters, default rendering, and a shipping-mode filter state are covered by automated Streamlit render tests.
+- The clear-all-filters control is exercised by clicking the control by label, not by button index, because button positions shift as panels render.
+- The route-planning simulator is covered by render and unit tests, including the case where the dashboard's column set omits `Order City`.
 - `Late_delivery_risk` is displayed separately from the calculated delay rate because their definitions differ in the source data.
 
 ## Known scope limits
 
 - The supplied dataset has no order or delivery date field; date-range filtering is intentionally excluded.
 - This project is diagnostic analytics. Predicting future delays and optimizing routes are future extensions, not claimed features.
+- `Latitude` and `Longitude` are the customer's home location, not the shipment destination. The geographic map therefore plots where customers are, grouped under the order country they ordered into. Treat it as a customer-footprint view, not a delivery-origin map.
+- The map renders the 250 largest clusters only, which is roughly 3% of the filtered rows. This cap is a rendering-performance guard, not a complete view.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -44,13 +45,15 @@ def shipments(limit: int = Query(default=100, ge=1, le=1000), shipping_mode: str
         values.append(shipping_mode)
     query += " LIMIT ?"
     values.append(limit)
-    with _connection() as connection:
+    # A sqlite3 connection's context manager commits the transaction but does
+    # not close the connection, so close it explicitly on every request.
+    with closing(_connection()) as connection:
         return [dict(row) for row in connection.execute(query, values).fetchall()]
 
 
 @app.get("/summary")
 def summary() -> dict[str, float | int]:
-    with _connection() as connection:
+    with closing(_connection()) as connection:
         row = connection.execute(
             "SELECT COUNT(*) AS shipments, AVG(is_delayed) * 100 AS delayed_rate, AVG(delivery_delay_gap) AS average_delay_days FROM shipments"
         ).fetchone()
